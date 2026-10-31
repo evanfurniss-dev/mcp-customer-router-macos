@@ -58,5 +58,5 @@ jobs:
             "release/mcp-customer-router-${version}.tar.gz" \
             "release/mcp-customer-router-${version}.tar.gz.sha256" \
             release/mcp-customer-router.rb \
-            --verify-tag --title "Customer MCP Router ${version}" \
+            --verify-tag --title "Customer MCP Router for macOS ${version}" \
             --notes-file docs/RELEASE-NOTES.md

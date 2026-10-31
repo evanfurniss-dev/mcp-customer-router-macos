@@ -1,4 +1,4 @@
-# Homebrew releases
+# macOS Homebrew releases
 
 The tap is [evanfurniss-dev/homebrew-tap](https://github.com/evanfurniss-dev/homebrew-tap). Its `Formula/mcp-customer-router.rb` downloads a prebuilt archive from this repository's GitHub Releases. Homebrew supplies Node. Publication uses GitHub's repository token; it needs no npm account or cross-repository token.
 
@@ -65,7 +65,7 @@ gh release create "$tag" \
   "release/mcp-customer-router-${version}.tar.gz" \
   "release/mcp-customer-router-${version}.tar.gz.sha256" \
   release/mcp-customer-router.rb \
-  --verify-tag --title "Customer MCP Router ${version}" \
+  --verify-tag --title "Customer MCP Router for macOS ${version}" \
   --notes-file docs/RELEASE-NOTES.md
 ```
 

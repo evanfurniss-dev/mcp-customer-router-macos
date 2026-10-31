@@ -4,11 +4,11 @@ Keep changes focused on local customer connections, safe configuration edits, an
 
 ## Run from source
 
-Use Node.js 22.12 or newer and the pnpm version declared in `package.json`. CI checks Node 22 and 24.
+Develop this version on macOS. Use Node.js 22.12 or newer and the pnpm version declared in `package.json`. CI checks Node 22 and 24.
 
 ```sh
-git clone https://github.com/evanfurniss-dev/mcp-customer-router.git
-cd mcp-customer-router
+git clone https://github.com/evanfurniss-dev/mcp-customer-router-macos.git
+cd mcp-customer-router-macos
 pnpm install --frozen-lockfile
 pnpm --dir web install --frozen-lockfile
 pnpm build

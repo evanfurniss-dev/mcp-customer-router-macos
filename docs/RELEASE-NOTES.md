@@ -1,4 +1,4 @@
-Customer MCP Router 0.2.1 selects **Ignore** for existing connections by default.
+Customer MCP Router for macOS 0.2.1 selects **Ignore** for existing connections by default.
 
 Each new configuration preview starts with **Ignore** selected for every detected existing connection. You can apply the router configuration without selecting each row. Choose **Remove** explicitly for an entry you want to remove, then select **Apply and remove N**.
 

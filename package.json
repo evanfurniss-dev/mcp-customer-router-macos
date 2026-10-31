@@ -1,7 +1,7 @@
 {
   "name": "@evanfurniss-dev/mcp-customer-router",
   "version": "0.2.1",
-  "description": "Share customer-specific Glide MCP connections across local AI coding apps",
+  "description": "Share customer-specific Glide MCP connections across local AI coding apps on macOS",
   "keywords": [
     "mcp",
     "glide",
@@ -16,7 +16,7 @@
     "url": "https://github.com/evanfurniss-dev"
   },
   "license": "MIT",
-  "repository": "https://github.com/evanfurniss-dev/mcp-customer-router",
+  "repository": "https://github.com/evanfurniss-dev/mcp-customer-router-macos",
   "type": "module",
   "files": [
     "dist",
@@ -95,8 +95,8 @@
   "contributors": [
     "Glen Maddern and the mcp-remote contributors"
   ],
-  "homepage": "https://github.com/evanfurniss-dev/mcp-customer-router#readme",
+  "homepage": "https://github.com/evanfurniss-dev/mcp-customer-router-macos#readme",
   "bugs": {
-    "url": "https://github.com/evanfurniss-dev/mcp-customer-router/issues"
+    "url": "https://github.com/evanfurniss-dev/mcp-customer-router-macos/issues"
   }
 }

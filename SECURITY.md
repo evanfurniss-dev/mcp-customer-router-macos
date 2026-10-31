@@ -2,7 +2,7 @@
 
 ## Report a vulnerability
 
-Use [GitHub's private vulnerability report form](https://github.com/evanfurniss-dev/mcp-customer-router/security/advisories/new). Describe the affected version, expected access boundary, and steps to reproduce with synthetic data.
+Use [GitHub's private vulnerability report form](https://github.com/evanfurniss-dev/mcp-customer-router-macos/security/advisories/new). Describe the affected version, expected access boundary, and steps to reproduce with synthetic data.
 
 Do not post credentials, customer records, authorization links, or exploitable security details in public issues. If private reporting is unavailable, open a public issue requesting a private contact without disclosing the vulnerability.
 

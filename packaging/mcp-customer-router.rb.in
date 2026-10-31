@@ -1,9 +1,9 @@
 require "json"
 
 class McpCustomerRouter < Formula
-  desc "Share separate Glide customer connections across Claude Code and Codex"
-  homepage "https://github.com/evanfurniss-dev/mcp-customer-router"
-  url "https://github.com/evanfurniss-dev/mcp-customer-router/releases/download/router-v@@VERSION@@/mcp-customer-router-@@VERSION@@.tar.gz"
+  desc "Share separate Glide customer connections across local AI coding apps on macOS"
+  homepage "https://github.com/evanfurniss-dev/mcp-customer-router-macos"
+  url "https://github.com/evanfurniss-dev/mcp-customer-router-macos/releases/download/router-v@@VERSION@@/mcp-customer-router-@@VERSION@@.tar.gz"
   version "@@VERSION@@"
   sha256 "@@SHA256@@"
   license "MIT"

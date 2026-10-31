@@ -1,9 +1,12 @@
-# Customer MCP Router
+# Customer MCP Router for macOS
 
-[![Router checks](https://github.com/evanfurniss-dev/mcp-customer-router/actions/workflows/main.yaml/badge.svg)](https://github.com/evanfurniss-dev/mcp-customer-router/actions/workflows/main.yaml)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS-black.svg)](#install)
+[![Router checks](https://github.com/evanfurniss-dev/mcp-customer-router-macos/actions/workflows/main.yaml/badge.svg)](https://github.com/evanfurniss-dev/mcp-customer-router-macos/actions/workflows/main.yaml)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Connect each customer's Glide organization once, then use that saved connection from Claude Code and Codex. The router links a local project folder to one customer and checks the organization before allowing tool calls.
+
+This repository contains the macOS version. A separate Linux version is planned.
 
 ![Customer MCP Router guided setup](docs/images/setup-tour.png)
 
@@ -94,7 +97,7 @@ See [verification evidence](docs/VERIFICATION.md) for tested paths and remaining
 
 Use `mcp-customer-router --help` for commands, or `mcp-customer-router service status` to inspect the local service.
 
-[Contributing and source setup](CONTRIBUTING.md) · [Report a bug](https://github.com/evanfurniss-dev/mcp-customer-router/issues/new/choose) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md) · [Release process](docs/RELEASING.md)
+[Contributing and source setup](CONTRIBUTING.md) · [Report a bug](https://github.com/evanfurniss-dev/mcp-customer-router-macos/issues/new/choose) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md) · [Release process](docs/RELEASING.md)
 
 ## Attribution
 
