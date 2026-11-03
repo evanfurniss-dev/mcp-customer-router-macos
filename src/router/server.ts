@@ -119,6 +119,18 @@ export function createRouterServer(options: ServerOptions) {
   }
 
   app.post(
+    '/api/customers/:id/endpoint',
+    route(async (request, response) => {
+      const id = String(request.params.id)
+      if (jobs.isRunning(id)) throw new UserError('Wait for the connection check to finish.', 409)
+      const customer = await options.store.setEndpoint(id, request.body?.serverUrl)
+      // A sign-in kept from an earlier switch only needs a check. Otherwise start a new sign-in for this endpoint.
+      const mode = (await options.store.hasSavedSignIn(id, customer.serverUrl)) ? 'check' : 'connect'
+      response.json({ customer, mode, jobId: await jobs.start(id, mode) })
+    }),
+  )
+
+  app.post(
     '/api/projects/choose-folder',
     route(async (_request, response) => {
       if (choosingFolder) throw new UserError('A folder chooser is already open. Finish or cancel it before opening another.', 409)

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added Glide MCP v2 (`https://mcp.glideapps.dev/mcp/v2`). New customers default to v2. Existing customers keep v1 until switched.
+- Added **Switch to v2** and **Switch to v1** in customer settings. Switching ends open sessions and needs no project settings change.
+- Kept a separate saved sign-in for each version. **Reconnect Glide** now replaces only the current version's sign-in, so switching back only needs a check.
+- Reported missing MCP v2 access on a Glide account instead of a general connection failure.
+
 ## 0.2.1
 
 - Preselect **Ignore** for each existing connection on every new configuration preview. Choose **Remove** explicitly to include a connection in removal when applying.

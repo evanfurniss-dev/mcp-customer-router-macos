@@ -48,6 +48,13 @@ describe('authenticated organization identity', () => {
     expect(verifyIdentity(identity(), endpoint, 'customer-a')).toBe('customer-a')
   })
 
+  it('reads the same citation from the v2 endpoint and rejects other paths', () => {
+    expect(verifyIdentity(identity(), 'https://mcp.glideapps.dev/mcp/v2', 'customer-a')).toBe('customer-a')
+    for (const serverUrl of ['https://mcp.glideapps.dev/mcp/v3', 'https://mcp.glideapps.dev/mcp/v2/', 'https://mcp.glideapps.dev/']) {
+      expect(() => verifyIdentity(identity(), serverUrl, 'customer-a')).toThrow('not supported')
+    }
+  })
+
   it('accepts the one-character organization ID 1 and still blocks a different expected ID', () => {
     expect(verifyIdentity(identity('1'), endpoint, '1')).toBe('1')
     expect(() => verifyIdentity(identity('1'), endpoint, '2')).toThrow('different organization')
@@ -160,7 +167,7 @@ async function checkChild(spec: ConnectionSpec) {
   })
 }
 
-async function fixture({ holdIdentity = false } = {}) {
+async function fixture({ holdIdentity = false, v2NotFound = false } = {}) {
   let releaseIdentity!: () => void
   let markIdentityRequested!: () => void
   const identityReleased = new Promise<void>((resolve) => {
@@ -252,6 +259,10 @@ async function fixture({ holdIdentity = false } = {}) {
       })
       return
     }
+    if (v2NotFound && request.url === '/mcp/v2') {
+      json({ error: 'Not found' }, 404)
+      return
+    }
     if (request.method !== 'POST') {
       response.writeHead(405).end()
       return
@@ -293,9 +304,9 @@ async function fixture({ holdIdentity = false } = {}) {
     server.closeAllConnections()
     await new Promise<void>((resolve) => server.close(() => resolve()))
   })
-  const spec = async (org: string, expired = false): Promise<ConnectionSpec> => {
+  const spec = async (org: string, expired = false, mcpPath = '/mcp'): Promise<ConnectionSpec> => {
     const authDir = await tempAuth()
-    const serverUrl = `${origin}/mcp`
+    const serverUrl = `${origin}${mcpPath}`
     const directory = path.join(authDir, 'mcp-remote-v1')
     await fs.mkdir(directory)
     const hash = getServerUrlHash(serverUrl)
@@ -747,6 +758,46 @@ describe('real SDK clients against a local OAuth fixture', () => {
     expect(remote.calls.filter((call) => call.tool === 'echo')).toHaveLength(0)
     expect(remote.registrations()).toBe(0)
     expect(connected.stderr()).toBe('')
+  }, 15000)
+
+  it('serves a verified v2 connection', async () => {
+    const remote = await fixture()
+    const configuration = await remote.spec('customer-a', false, '/mcp/v2')
+    const connected = await remote.client(configuration)
+    expect(await connected.client.callTool({ name: 'echo', arguments: {} })).toMatchObject({ content: [{ text: 'customer-a' }] })
+    expect(connected.stderr()).toBe('')
+  }, 15000)
+
+  it('reports missing v2 access instead of a generic failure', async () => {
+    const remote = await fixture({ v2NotFound: true })
+    const result = await checkChild(await remote.spec('customer-a', false, '/mcp/v2'))
+    expect(JSON.parse(result.output)).toMatchObject({ state: 'error', message: expect.stringContaining('does not have MCP v2 access') })
+    expect(result.stderr).toBe('')
+  }, 15000)
+
+  it('replaces only the selected endpoint sign-in during a fresh v2 sign-in', async () => {
+    const remote = await fixture()
+    const configuration = await remote.spec('customer-a', false, '/mcp/v2')
+    configuration.customer.callbackPort = await freeCallbackPort()
+    const kept = path.join(configuration.authDir, 'mcp-remote-v1', `${getServerUrlHash(`${remote.origin()}/mcp`)}_tokens.json`)
+    await fs.writeFile(kept, 'v1 sign-in')
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const browserRequests: Promise<unknown>[] = []
+    vi.mocked(open).mockImplementation(async (target) => {
+      browserRequests.push(fetch(String(target)).then((response) => response.text()))
+      return {} as ChildProcess
+    })
+    const prior = process.env.MCP_REMOTE_CONFIG_DIR
+    try {
+      const connection = await runCustomerConnection(configuration, 'connect')
+      expect(connection.check).toMatchObject({ state: 'verified', observedOrgId: 'customer-a' })
+      expect(remote.registrations()).toBe(1)
+      await Promise.all(browserRequests)
+      expect(await fs.readFile(kept, 'utf8')).toBe('v1 sign-in')
+    } finally {
+      if (prior === undefined) delete process.env.MCP_REMOTE_CONFIG_DIR
+      else process.env.MCP_REMOTE_CONFIG_DIR = prior
+    }
   }, 15000)
 
   it('returns an unsigned state without starting login when no credential exists', async () => {

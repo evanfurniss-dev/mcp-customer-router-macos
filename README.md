@@ -28,7 +28,7 @@ You can close the browser and Terminal. The Mac must stay awake for local agent 
 
 ## Set up a customer
 
-1. Select **New**. Enter a name, business label, and the organization ID from the customer's Glide URL, after `/o/`.
+1. Select **New**. Enter a name, business label, and the organization ID from the customer's Glide URL, after `/o/`. Keep **v2** selected, or choose **v1** for the full Glide tool set.
 2. Select **Connect Glide**, complete sign-in, and choose that organization. If the browser does not open, select **Open Glide sign-in**. Wait for **Organization verified**.
 3. Select **Choose folder**, then **Preview config**. Existing Glide connections start with **Ignore** selected. Choose **Remove** for any entries you want to remove, then apply the configuration.
 4. Open that folder in your AI client and start a fresh session. Accept any project trust or MCP approval prompts. Ask the agent to list projects through `customer-glide` and check the organization before making changes.
@@ -48,6 +48,19 @@ The walkthrough opens on the first visit. The **ⓘ** button opens it again. **C
 
 Claude app and Conductor guides are based on their documentation; live router trials for those two clients remain open. Each AI provider still needs its own account. See [client setup and verification limits](docs/CLIENT-SETUP.md).
 
+### Choose v1 or v2
+
+Each customer uses one Glide MCP version at a time:
+
+| Version | Endpoint | Tools |
+| --- | --- | --- |
+| v2 (default for new customers) | `https://mcp.glideapps.dev/mcp/v2` | About 15 tools: project lookup, app files, previews, publishing, and the database. Requires MCP v2 access on your Glide account. |
+| v1 | `https://mcp.glideapps.dev/mcp` | The full tool set, including workflows, integrations, spreadsheets, `bash`, and backend code. |
+
+Customers saved before v2 support keep v1. To change a customer, open it and select **Switch to v2** or **Switch to v1** beside **MCP endpoint**. Switching ends the customer's open agent sessions. Linked folders use the new version from their next session; you do not need to apply their settings again.
+
+Each version keeps its own Glide sign-in. The first switch to a version starts a sign-in. Switching back to a version used before only checks its saved sign-in. If v2 reports that your account lacks MCP v2 access, switch the customer to v1 or ask for access.
+
 ### Review existing connections
 
 **Preview config** detects other Glide entries in supported project and user settings. Each new preview selects **Ignore** for every entry, which keeps it unchanged. Choose **Remove** explicitly to remove an entry when you select **Apply and remove N**. The review shows when removal affects other projects.
@@ -60,7 +73,7 @@ The router saves a separate Glide authorization for each customer. Linking a fol
 
 By default, customer records, bindings, credentials, and logs live in `~/.mcp-customer-router/`. Settings backups stay beside the original files. The dashboard listens only on `127.0.0.1`; each client bridge can continue with the dashboard closed.
 
-**Check identity** reuses the saved authorization. **Reconnect Glide** starts a fresh authorization for that customer and invalidates its older router sessions. Open fresh client sessions after reconnecting. A separate folder or Git worktree needs its own binding.
+**Check identity** reuses the saved authorization. **Reconnect Glide** starts a fresh authorization for that customer's current MCP version and invalidates its older router sessions. The other version's saved sign-in is kept. Open fresh client sessions after reconnecting. A separate folder or Git worktree needs its own binding.
 
 ## Update or remove
 
@@ -81,7 +94,7 @@ brew uninstall mcp-customer-router
 
 ## Scope and limits
 
-- The current connector targets Glide's MCP endpoint, `https://mcp.glideapps.dev/mcp`.
+- The connector supports Glide's v1 (`https://mcp.glideapps.dev/mcp`) and v2 (`https://mcp.glideapps.dev/mcp/v2`) MCP endpoints.
 - Connections are separated within one macOS account. An agent with broad file access can read other credential directories. This is not a sandbox for untrusted tenants.
 - Execution stays on the Mac. Cloud hosting and scheduled agent runs are outside this release.
 - Credentials use private files. Removing a saved customer retains those files and does not revoke access at Glide.

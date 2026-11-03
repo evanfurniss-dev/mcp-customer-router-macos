@@ -9,6 +9,11 @@ export interface Customer {
   updatedAt: string
   lastCheck?: { state: 'verified' | 'error' | 'mismatch' | 'unverified'; checkedAt: string; observedOrgId?: string; message: string }
 }
+export const ENDPOINTS = { v1: 'https://mcp.glideapps.dev/mcp', v2: 'https://mcp.glideapps.dev/mcp/v2' } as const
+export type EndpointVersion = keyof typeof ENDPOINTS
+export function endpointVersion(serverUrl: string): EndpointVersion | undefined {
+  try { const path = new URL(serverUrl).pathname; return path === '/mcp/v2' ? 'v2' : path === '/mcp' ? 'v1' : undefined } catch { return undefined }
+}
 export interface Job { id: string; customerId: string; state: 'running' | 'complete' | 'failed'; message: string; startedAt: string; finishedAt?: string; authorizationUrl?: string }
 export interface RouterState { customers: Customer[]; bindings: { path: string; customerId: string; createdAt: string }[]; jobs: Job[] }
 export interface ExistingConnection {

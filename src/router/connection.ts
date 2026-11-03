@@ -7,17 +7,19 @@ import {
   Client,
   StreamableHTTPClientTransport,
   createFetchWithInit,
+  SdkHttpError,
   type Transport,
   type OAuthClientInformationContext,
   type OAuthDiscoveryState,
 } from '@modelcontextprotocol/client'
 import { NodeOAuthClientProvider, OAuthTokensWithExpiresAtSchema } from '../lib/node-oauth-client-provider'
-import { readJsonFile } from '../lib/mcp-auth-config'
+import { getConfigDir, readJsonFile } from '../lib/mcp-auth-config'
 import { createLazyAuthCoordinator, hasUsableTokens } from '../lib/coordination'
 import { connectToRemoteServer, discoverOAuthServerInfo, fetchWithMcpHeaders, getServerUrlHash, mcpProxy } from '../lib/utils'
 import type { OAuthProviderOptions } from '../lib/types'
 import type { ConnectionCheck, Customer } from './types'
 import { IdentityGateTransport } from './identity-gate-transport'
+import { endpointVersion } from './endpoints'
 
 export type ConnectionMode = 'connect' | 'check' | 'serve'
 export interface ConnectionSpec {
@@ -48,10 +50,8 @@ const record = (value: unknown): value is Record<string, unknown> => !!value && 
 const orgIdPattern = /^[a-zA-Z0-9_-]{1,128}$/
 
 function dashboardOrigin(serverUrl: string): string {
+  if (!endpointVersion(serverUrl)) throw new ConnectionError('error', 'The MCP address is not supported.')
   const endpoint = new URL(serverUrl)
-  if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== '/mcp') {
-    throw new ConnectionError('error', 'The MCP address is not supported.')
-  }
   if (endpoint.origin === 'https://mcp.glideapps.dev') return 'https://os.glideapps.dev'
   // A loopback endpoint exists only for local fixture testing. No arbitrary remote identity origins.
   if (endpoint.protocol === 'http:' && endpoint.hostname === '127.0.0.1' && endpoint.port) return endpoint.origin
@@ -80,6 +80,15 @@ export function verifyIdentity(result: unknown, serverUrl: string, expectedOrgId
     throw new ConnectionError('mismatch', 'This sign-in belongs to a different organization. Tools are blocked.', observed)
   }
   return observed
+}
+
+/** Glide returns 404 from /mcp/v2 after sign-in when the account does not have v2 access. */
+function isNotFound(error: unknown): boolean {
+  for (let current = error, depth = 0; current instanceof Error && depth < 5; current = current.cause, depth++) {
+    if (current instanceof SdkHttpError && current.status === 404) return true
+    if (/\bHTTP 404\b|\b404\b.*Not Found/i.test(current.message)) return true
+  }
+  return false
 }
 
 /** A fresh explicit sign-in invalidates every existing connection to this customer. */
@@ -348,10 +357,20 @@ export async function runCustomerConnection(
   const guard = await GenerationGuard.create(authDir)
   process.env.MCP_REMOTE_CONFIG_DIR = authDir
   const allowLogin = mode === 'connect'
-  if (allowLogin) {
-    await guard.mutate(() => fs.rm(path.join(authDir, 'mcp-remote-v1'), { recursive: true, force: true }))
-  }
   const hash = getServerUrlHash(customer.serverUrl)
+  if (allowLogin) {
+    // Replace only this endpoint's sign-in. The other endpoint's sign-in stays for switching back.
+    await guard.mutate(async () => {
+      const directory = getConfigDir()
+      const entries = await fs.readdir(directory).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return []
+        throw error
+      })
+      await Promise.all(
+        entries.filter((entry) => entry.startsWith(`${hash}_`)).map((entry) => fs.rm(path.join(directory, entry), { force: true })),
+      )
+    })
+  }
   if (!allowLogin && !(await hasUsableTokens(hash))) {
     throw new ConnectionError('unverified', 'Sign in from the customer dashboard, then check this connection.')
   }
@@ -403,7 +422,17 @@ export async function runCustomerConnection(
       return { waitForAuthCode: auth.waitForAuthCode, skipBrowserAuth: auth.skipBrowserAuth }
     }
     if (allowLogin) await initializeAuth()
-    await connectToRemoteServer(probe, customer.serverUrl, provider, {}, initializeAuth, 'http-only', 'auto')
+    try {
+      await connectToRemoteServer(probe, customer.serverUrl, provider, {}, initializeAuth, 'http-only', 'auto')
+    } catch (error) {
+      if (endpointVersion(customer.serverUrl) === 'v2' && isNotFound(error)) {
+        throw new ConnectionError(
+          'error',
+          'This Glide account does not have MCP v2 access. Switch this customer to v1, or ask for v2 access.',
+        )
+      }
+      throw error
+    }
     await coordinator.release()
     await guard.assertCurrent()
     const result = await probe.callTool({ name: 'project_list', arguments: {} })

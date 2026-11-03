@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { api, errorMessage, post, type Customer, type Job, type Plan, type RouterState, type ConnectionAction } from '@/lib/api'
+import { api, endpointVersion, ENDPOINTS, errorMessage, post, type Customer, type EndpointVersion, type Job, type Plan, type RouterState, type ConnectionAction } from '@/lib/api'
 import { useTheme } from '@/lib/theme'
 import { RouterWalkthrough, shouldShowWalkthrough } from '@/components/router-walkthrough'
 import { ClientSetup, useClientChoice } from '@/components/client-setup'
@@ -148,8 +148,9 @@ export default function App() {
 function NewCustomer({ open, onOpenChange, businesses, onCreated, returnFocus, successFocus }: { open: boolean; onOpenChange: (open: boolean) => void; businesses: string[]; onCreated: (customer: Customer) => void; returnFocus: React.RefObject<HTMLElement | null>; successFocus: React.RefObject<HTMLHeadingElement | null> }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [version, setVersion] = useState<EndpointVersion>('v2')
   const saved = useRef(false)
-  useEffect(() => { if (open) { setError(''); saved.current = false } }, [open])
+  useEffect(() => { if (open) { setError(''); setVersion('v2'); saved.current = false } }, [open])
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
@@ -168,7 +169,7 @@ function NewCustomer({ open, onOpenChange, businesses, onCreated, returnFocus, s
           <Field id="new-name" label="Customer name"><Input id="new-name" name="name" required maxLength={100} autoComplete="off" autoFocus /></Field>
           <Field id="new-business" label="Business"><Input id="new-business" name="business" required maxLength={100} autoComplete="off" list="business-options" placeholder="Your agency" /><datalist id="business-options">{businesses.map(value => <option value={value} key={value} />)}</datalist></Field>
           <Field id="new-org" label="Expected organization ID" hint="From the Glide organization URL."><Input id="new-org" name="expectedOrgId" required autoComplete="off" spellCheck={false} aria-describedby="new-org-hint" /></Field>
-          <details className="advanced-settings"><summary>MCP endpoint</summary><Field id="new-server" label="MCP server URL"><Input id="new-server" name="serverUrl" type="url" required defaultValue="https://mcp.glideapps.dev/mcp" autoComplete="off" spellCheck={false} /></Field></details>
+          <div className="form-field"><span id="new-version-label" className="field-label">Glide MCP version</span><div className="endpoint-options" role="group" aria-labelledby="new-version-label" aria-describedby="new-version-hint">{(['v2', 'v1'] as const).map(item => <Button key={item} type="button" variant="outline" aria-pressed={version === item} onClick={() => setVersion(item)}>{item}</Button>)}</div><input type="hidden" name="serverUrl" value={ENDPOINTS[version]} /><p id="new-version-hint" className="field-hint">{version === 'v2' ? 'v2 needs MCP v2 access on your Glide account. You can switch to v1 later.' : 'v1 has the full Glide tool set. You can switch to v2 later.'}</p></div>
         </DialogPanel>
         <DialogFooter><DialogClose render={<Button variant="ghost" disabled={saving} />}>Cancel</DialogClose><Button type="submit" loading={saving}>Save customer</Button></DialogFooter>
       </form>
@@ -188,6 +189,18 @@ function CustomerDetail({ customer, bindings, jobs, headingRef, unavailable, ref
   const runningJob = jobs.find(job => job.state === 'running')
   const running = !!runningJob || starting !== null
   const verified = customer.lastCheck?.state === 'verified'
+  const [switchOpen, setSwitchOpen] = useState(false)
+  const [switching, setSwitching] = useState(false)
+  const version = endpointVersion(customer.serverUrl)
+  const target: EndpointVersion = version === 'v2' ? 'v1' : 'v2'
+  async function switchEndpoint() {
+    setSwitching(true); setError('')
+    try {
+      const result = await post<{ jobId: string; mode: 'connect' | 'check' }>(`/api/customers/${encodeURIComponent(customer.id)}/endpoint`, { serverUrl: ENDPOINTS[target] })
+      setSwitchOpen(false); await jobStarted(result.jobId)
+      announce(`${customer.name} switched to MCP ${target}. ${result.mode === 'connect' ? 'Sign in to Glide to verify the organization.' : 'Checking the saved sign-in.'}`)
+    } catch (e) { setError(errorMessage(e)); setSwitchOpen(false) } finally { setSwitching(false) }
+  }
   async function run(action: 'connect' | 'check') {
     setStarting(action); setError('')
     try { const result = await post<{ jobId: string }>(`/api/customers/${encodeURIComponent(customer.id)}/${action}`); await jobStarted(result.jobId) }
@@ -203,7 +216,7 @@ function CustomerDetail({ customer, bindings, jobs, headingRef, unavailable, ref
     <header className="detail-header"><h1 ref={headingRef} tabIndex={-1}>{customer.name}</h1><div className="detail-meta">{customer.business !== customer.name && <span>{customer.business}</span>}<Status customer={customer} running={running} /></div></header>
     <section className="connection-section" aria-label="Connection">
       <div className="connection-heading"><h2>Connection</h2><div className="connection-actions"><Button variant="outline" onClick={() => void run('connect')} loading={starting === 'connect'} disabled={running || unavailable}>{verified ? 'Reconnect Glide' : 'Connect Glide'}</Button><Button variant="outline" onClick={() => void run('check')} loading={starting === 'check'} disabled={running || unavailable}>Check identity</Button></div></div>
-      <dl className="identity-grid"><div><dt>Organization ID</dt><dd className="mono">{customer.expectedOrgId}</dd></div>{customer.lastCheck?.observedOrgId && customer.lastCheck.observedOrgId !== customer.expectedOrgId && <div><dt>Observed org</dt><dd className="mono">{customer.lastCheck.observedOrgId}</dd></div>}<div className="endpoint-field"><dt>MCP endpoint</dt><dd className="mono">{customer.serverUrl}</dd></div><div><dt>Last check</dt><dd>{dateLabel(customer.lastCheck?.checkedAt)}</dd></div></dl>
+      <dl className="identity-grid"><div><dt>Organization ID</dt><dd className="mono">{customer.expectedOrgId}</dd></div>{customer.lastCheck?.observedOrgId && customer.lastCheck.observedOrgId !== customer.expectedOrgId && <div><dt>Observed org</dt><dd className="mono">{customer.lastCheck.observedOrgId}</dd></div>}<div className="endpoint-field"><dt>MCP endpoint</dt><dd><span className="endpoint-value"><Badge variant="outline">{version ?? 'custom'}</Badge><span className="mono">{customer.serverUrl}</span></span>{version && <Dialog open={switchOpen} onOpenChange={next => { if (!switching) setSwitchOpen(next) }}><DialogTrigger render={<Button variant="link" size="sm" className="endpoint-switch" disabled={running || unavailable} />}>Switch to {target}</DialogTrigger><DialogPopup showCloseButton={false} bottomStickOnMobile={false}><DialogHeader><DialogTitle>Switch {customer.name} to MCP {target}?</DialogTitle><DialogDescription>Open agent sessions for this customer will end. Linked folders use {target} from their next session, so you don't need to apply their settings again.</DialogDescription></DialogHeader><DialogPanel className="grid gap-3 switch-details">{target === 'v2' ? <><p>v2 has about 15 tools for app files, previews, publishing and the database. Workflows, integrations, spreadsheets, bash and backend code are only on v1.</p><p>If this customer hasn't used v2 before, you'll sign in to Glide once. Your account needs MCP v2 access. The v1 sign-in is kept, so switching back doesn't need a new one.</p></> : <p>The router reuses this customer's earlier v1 sign-in if it is still valid. Otherwise you'll sign in to Glide once. The v2 sign-in is kept.</p>}</DialogPanel><DialogFooter><DialogClose render={<Button variant="ghost" disabled={switching} />}>Cancel</DialogClose><Button loading={switching} onClick={() => void switchEndpoint()}>Switch to {target}</Button></DialogFooter></DialogPopup></Dialog>}</dd></div><div><dt>Last check</dt><dd>{dateLabel(customer.lastCheck?.checkedAt)}</dd></div></dl>
       {customer.lastCheck?.message && customer.lastCheck.state !== 'verified' && <Notice tone={customer.lastCheck.state === 'unverified' ? 'info' : 'error'}>{customer.lastCheck.message}</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
       {starting === 'connect' && !runningJob && <Notice>Preparing Glide sign-in…</Notice>}

@@ -46,11 +46,47 @@ describe('customer registry', () => {
       'https://evil.invalid/mcp',
       'https://secret@mcp.glideapps.dev/mcp',
       'https://mcp.glideapps.dev/mcp?org=org-a',
+      'https://mcp.glideapps.dev/mcp/v3',
     ]) {
-      await expect(store.add({ ...customer('org-b'), serverUrl })).rejects.toThrow('MVP supports')
+      await expect(store.add({ ...customer('org-b'), serverUrl })).rejects.toThrow('Use Glide MCP v1')
     }
     await expect(store.add(customer('../../elsewhere'))).rejects.toThrow('valid organization')
     expect(() => store.authDir('../../elsewhere')).toThrow('Invalid customer')
+  })
+
+  it('defaults new customers to v2, keeps v1 available, and saves one record per organization', async () => {
+    const store = await fixture()
+    expect((await store.add(customer('org-a'))).serverUrl).toBe('https://mcp.glideapps.dev/mcp/v2')
+    expect((await store.add({ ...customer('org-b'), serverUrl: 'https://mcp.glideapps.dev/mcp' })).serverUrl).toBe(
+      'https://mcp.glideapps.dev/mcp',
+    )
+    await expect(store.add({ ...customer('org-a'), serverUrl: 'https://mcp.glideapps.dev/mcp' })).rejects.toThrow('already')
+    await expect(store.add({ ...customer('org-b'), serverUrl: 'https://mcp.glideapps.dev/mcp/v2' })).rejects.toThrow('already')
+  })
+
+  it('switches endpoints by ending open sessions and requiring a new check, keeping each endpoint sign-in', async () => {
+    const store = await fixture()
+    const item = await store.add({ ...customer('org-a'), serverUrl: 'https://mcp.glideapps.dev/mcp' })
+    const generation = await store.generation(item.id)
+    await store.recordCheck(item.id, { state: 'verified', checkedAt: new Date().toISOString(), observedOrgId: 'org-a', message: 'ok' })
+    const cache = path.join(store.authDir(item.id), 'mcp-remote-v1')
+    await fs.mkdir(cache)
+    const { getServerUrlHash } = await import('../lib/utils')
+    await fs.writeFile(path.join(cache, `${getServerUrlHash('https://mcp.glideapps.dev/mcp')}_tokens.json`), '{}')
+
+    const switched = await store.setEndpoint(item.id, 'https://mcp.glideapps.dev/mcp/v2')
+    expect(switched).toMatchObject({ serverUrl: 'https://mcp.glideapps.dev/mcp/v2', lastCheck: { state: 'unverified' } })
+    expect(await store.generation(item.id)).not.toBe(generation)
+    expect(await store.hasSavedSignIn(item.id, 'https://mcp.glideapps.dev/mcp/v2')).toBe(false)
+    expect(await store.hasSavedSignIn(item.id, 'https://mcp.glideapps.dev/mcp')).toBe(true)
+
+    const unchanged = await store.generation(item.id)
+    await store.setEndpoint(item.id, 'https://mcp.glideapps.dev/mcp/v2')
+    expect(await store.generation(item.id)).toBe(unchanged)
+    for (const serverUrl of ['https://evil.invalid/mcp/v2', 'http://127.0.0.1:9/mcp', 42]) {
+      await expect(store.setEndpoint(item.id, serverUrl)).rejects.toThrow(/Use Glide MCP v1|supported Glide MCP endpoint/)
+    }
+    expect((await store.customer(item.id)).serverUrl).toBe('https://mcp.glideapps.dev/mcp/v2')
   })
 
   it('requires verified identity and preserves project ownership through nested paths', async () => {

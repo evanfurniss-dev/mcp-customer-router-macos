@@ -12,6 +12,14 @@ Checked on 2026-10-21, from release commit `8553e7e3d21dbcbc408188b88f89a22d7ce9
 
 The release checks made no new Glide sign-in or customer business-data writes. Claude desktop Code and Conductor have setup guides; live router trials for those clients remain open. A fresh user's complete sign-in, Intel Mac operation, overnight refresh, and 30-organization load trials also remain unverified. See [CLIENT-SETUP.md](CLIENT-SETUP.md) for client-specific scope.
 
+## Glide MCP v2 support
+
+Checked on 2026-11-03 on branch `mcp-v2-endpoint`.
+
+- A live v2 sign-in through a temporary dashboard verified an organization with the unchanged `project_list` identity check. v2 returns the same organization citation as v1. The account had MCP v2 access.
+- Router tests cover the v2 default, the endpoint allowlist, one record per organization, switching in both directions, kept per-version sign-ins, a served v2 session, and the missing-access message. They use a local fixture.
+- Not yet checked live: switching a signed-in customer between versions, an agent session calling v2 tools through a linked folder, and the missing-access message from Glide.
+
 ## Earlier MVP checks
 
 The sections below retain evidence from earlier builds. Their test counts, interface descriptions, and installation paths describe those builds at the stated dates.

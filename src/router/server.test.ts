@@ -321,6 +321,46 @@ describe('local dashboard API', () => {
     for (const file of preview.files) expect(await fs.readFile(file.path, 'utf8')).toBe(file.content)
   })
 
+  it('switches endpoints with a new sign-in, or only a check when that endpoint kept its sign-in', async () => {
+    const { store, request, runner } = await setup()
+    const customer = await store.add({
+      name: 'Acme',
+      business: 'Example',
+      expectedOrgId: 'org-a',
+      serverUrl: 'https://mcp.glideapps.dev/mcp',
+    })
+    const toV2 = await request(`/api/customers/${customer.id}/endpoint`, 'POST', { serverUrl: 'https://mcp.glideapps.dev/mcp/v2' })
+    expect(toV2.status).toBe(200)
+    expect(await toV2.json()).toMatchObject({ mode: 'connect', customer: { serverUrl: 'https://mcp.glideapps.dev/mcp/v2' } })
+    await vi.waitFor(async () => expect((await store.customer(customer.id)).lastCheck?.state).toBe('verified'))
+    expect(runner).toHaveBeenLastCalledWith(
+      expect.objectContaining({ serverUrl: 'https://mcp.glideapps.dev/mcp/v2' }),
+      'connect',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
+
+    const { getServerUrlHash } = await import('../lib/utils')
+    const cache = path.join(store.authDir(customer.id), 'mcp-remote-v1')
+    await fs.mkdir(cache, { recursive: true })
+    await fs.writeFile(path.join(cache, `${getServerUrlHash('https://mcp.glideapps.dev/mcp')}_tokens.json`), '{}')
+    const toV1 = await request(`/api/customers/${customer.id}/endpoint`, 'POST', { serverUrl: 'https://mcp.glideapps.dev/mcp' })
+    expect(await toV1.json()).toMatchObject({ mode: 'check', customer: { serverUrl: 'https://mcp.glideapps.dev/mcp' } })
+    await vi.waitFor(() => expect(runner).toHaveBeenCalledTimes(2))
+    expect(runner).toHaveBeenLastCalledWith(
+      expect.objectContaining({ serverUrl: 'https://mcp.glideapps.dev/mcp' }),
+      'check',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
+
+    await vi.waitFor(async () => expect((await store.customer(customer.id)).lastCheck?.state).toBe('verified'))
+    const invalid = await request(`/api/customers/${customer.id}/endpoint`, 'POST', { serverUrl: 'https://evil.invalid/mcp' })
+    expect(invalid.status).toBe(400)
+  })
+
   it('records completed checks with their verified organization', async () => {
     const { store, request, runner } = await setup()
     const customer = await store.add({ name: 'Acme', business: 'Example', expectedOrgId: 'org-a' })

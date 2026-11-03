@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { UserError, type ConnectionCheck, type Customer, type Registry } from './types'
+import { DEFAULT_ENDPOINT, endpointVersion } from './endpoints'
+import { getServerUrlHash } from '../lib/utils'
 
 const checkSchema = z.object({
   state: z.enum(['verified', 'error', 'mismatch', 'unverified']),
@@ -15,7 +17,7 @@ const checkSchema = z.object({
 const customerInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   business: z.string().trim().min(1).max(100),
-  serverUrl: z.string().url().default('https://mcp.glideapps.dev/mcp'),
+  serverUrl: z.string().url().default(DEFAULT_ENDPOINT),
   expectedOrgId: z
     .string()
     .trim()
@@ -33,6 +35,13 @@ const registrySchema = z.object({
   customers: z.array(customerSchema),
   bindings: z.array(z.object({ path: z.string(), customerId: z.string().uuid(), createdAt: z.string() })),
 })
+
+function supportedEndpoint(serverUrl: string): URL {
+  if (!endpointVersion(serverUrl)) {
+    throw new UserError('Use Glide MCP v1 (https://mcp.glideapps.dev/mcp) or v2 (https://mcp.glideapps.dev/mcp/v2).')
+  }
+  return new URL(serverUrl)
+}
 
 export function defaultHome(): string {
   return path.resolve(process.env.CUSTOMER_ROUTER_HOME || path.join(os.homedir(), '.mcp-customer-router'))
@@ -156,16 +165,25 @@ export class RegistryStore {
     return path.join(this.home, 'customers', id, 'auth')
   }
 
+  /** True when this customer has kept a sign-in for the endpoint. The connection check still decides whether it works. */
+  async hasSavedSignIn(id: string, serverUrl: string): Promise<boolean> {
+    const file = path.join(this.authDir(id), 'mcp-remote-v1', `${getServerUrlHash(serverUrl)}_tokens.json`)
+    try {
+      return (await fs.lstat(file)).isFile()
+    } catch {
+      return false
+    }
+  }
+
   async add(input: unknown): Promise<Customer> {
     const parsed = customerInputSchema.safeParse(input)
     if (!parsed.success) throw new UserError('Enter a customer name, business, valid organization ID, and MCP URL.')
-    const url = new URL(parsed.data.serverUrl)
-    const isLocalFixture = url.protocol === 'http:' && url.hostname === '127.0.0.1' && url.pathname === '/mcp'
-    if (url.username || url.password || url.hash || url.search || (url.href !== 'https://mcp.glideapps.dev/mcp' && !isLocalFixture)) {
-      throw new UserError('This MVP supports https://mcp.glideapps.dev/mcp. Loopback MCP URLs are reserved for local tests.')
-    }
+    const url = supportedEndpoint(parsed.data.serverUrl)
     return this.update(async (registry) => {
-      if (registry.customers.some((item) => item.serverUrl === url.href && item.expectedOrgId === parsed.data.expectedOrgId)) {
+      // One record per organization: v1 and v2 are two ways into the same customer, not two customers.
+      if (
+        registry.customers.some((item) => new URL(item.serverUrl).origin === url.origin && item.expectedOrgId === parsed.data.expectedOrgId)
+      ) {
         throw new UserError('This Glide organization already has a saved customer connection.', 409)
       }
       const usedPorts = new Set(registry.customers.map((item) => item.callbackPort))
@@ -186,6 +204,28 @@ export class RegistryStore {
       }
       await this.rotateGeneration(customer.id)
       registry.customers.push(customer)
+      return customer
+    })
+  }
+
+  /** Switching endpoints ends open sessions. Each endpoint keeps its own saved sign-in, so switching back needs no new one. */
+  async setEndpoint(id: string, serverUrl: unknown): Promise<Customer> {
+    if (typeof serverUrl !== 'string') throw new UserError('Choose a supported Glide MCP endpoint.')
+    const url = supportedEndpoint(serverUrl)
+    return this.update(async (registry) => {
+      const customer = registry.customers.find((item) => item.id === id)
+      if (!customer) throw new UserError('Customer not found.', 404)
+      if (customer.serverUrl === url.href) return customer
+      if (new URL(customer.serverUrl).origin !== url.origin) throw new UserError('Choose a supported Glide MCP endpoint.')
+      await this.rotateGeneration(id)
+      const timestamp = new Date().toISOString()
+      customer.serverUrl = url.href
+      customer.lastCheck = {
+        state: 'unverified',
+        checkedAt: timestamp,
+        message: `Switched to MCP ${endpointVersion(url.href)}. Check the connection before using it.`,
+      }
+      customer.updatedAt = timestamp
       return customer
     })
   }

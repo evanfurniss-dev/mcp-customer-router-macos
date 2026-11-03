@@ -19,6 +19,12 @@ Source: `src/router/project-config.ts`, `generateProjectConfigEntry`. The `serve
 | Codex CLI       | Start `codex` in the bound folder; inspect `/mcp`                       | Same Codex sources. After setup changes, use a new session to load the configuration.                                                                                                                                                                                                                                                                                                                           |
 | Conductor       | Local workspace running Claude Code or Codex                            | [MCP configuration](https://www.conductor.build/docs/reference/mcp), [Git worktrees](https://www.conductor.build/docs/concepts/git-worktrees). Conductor loads agent-specific configuration and creates a separate worktree for each workspace. Bind that workspace’s folder, then start a new agent session and refresh MCP status.                                                                            |
 
+## Glide MCP v1 and v2
+
+The generated entry does not name a Glide endpoint. Each bridge reads the customer's current version when a client session starts, so switching versions in the dashboard needs no settings change. Start a new session after switching.
+
+On v2, every tool except `load` needs a `projectId`. Ask the agent to find the project with `project_list` or `project_search` first. v2 provides its own instructions and loads skills through the `load` tool instead of guidance resources.
+
 The Mac-local stdio entries do not supply an executable or credentials to a cloud workspace. Remote execution needs a separate installation and connection design.
 
 ## Verification limits
