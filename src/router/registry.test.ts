@@ -110,6 +110,25 @@ describe('customer registry', () => {
     await expect(store.add(customer('org-c'))).rejects.toThrow('invalid JSON')
   })
 
+  it('moves a customer saved with another Glide MCP address to the supported one and requires a new check', async () => {
+    const store = await fixture()
+    const a = await store.add(customer('org-a'))
+    const b = await store.add(customer('org-b'))
+    const verified = { state: 'verified' as const, observedOrgId: 'org-b', checkedAt: new Date().toISOString(), message: 'Verified.' }
+    await store.recordCheck(b.id, verified)
+    const file = path.join(store.home, 'registry.json')
+    const saved = JSON.parse(await fs.readFile(file, 'utf8'))
+    saved.customers[1].serverUrl = 'https://mcp.glideapps.dev/mcp/other'
+    await fs.writeFile(file, JSON.stringify(saved))
+    const moved = await store.customer(b.id)
+    expect(moved.serverUrl).toBe('https://mcp.glideapps.dev/mcp')
+    expect(moved.lastCheck).toMatchObject({ state: 'unverified', message: expect.stringContaining('Check identity') })
+    expect((await store.customer(a.id)).lastCheck).toBeUndefined()
+    await store.rotateGeneration(a.id)
+    await store.add(customer('org-c'))
+    expect(JSON.parse(await fs.readFile(file, 'utf8')).customers[1].serverUrl).toBe('https://mcp.glideapps.dev/mcp')
+  })
+
   it('refuses a registry symlink without touching the target', async () => {
     const store = await fixture()
     const target = path.join(store.home, 'target')

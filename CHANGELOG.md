@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- A customer saved with a Glide MCP address other than `https://mcp.glideapps.dev/mcp` now moves to that address. Its next identity check or sign-in confirms the organization again before configuration changes.
+- Renamed the repository to `mcp-customer-router-macos` and updated its links.
+
 ## 0.2.1
 
 - Preselect **Ignore** for each existing connection on every new configuration preview. Choose **Remove** explicitly to include a connection in removal when applying.

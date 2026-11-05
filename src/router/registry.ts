@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { UserError, type ConnectionCheck, type Customer, type Registry } from './types'
 
+const GLIDE_ENDPOINT = 'https://mcp.glideapps.dev/mcp'
 const checkSchema = z.object({
   state: z.enum(['verified', 'error', 'mismatch', 'unverified']),
   checkedAt: z.string(),
@@ -15,7 +16,7 @@ const checkSchema = z.object({
 const customerInputSchema = z.object({
   name: z.string().trim().min(1).max(100),
   business: z.string().trim().min(1).max(100),
-  serverUrl: z.string().url().default('https://mcp.glideapps.dev/mcp'),
+  serverUrl: z.string().url().default(GLIDE_ENDPOINT),
   expectedOrgId: z
     .string()
     .trim()
@@ -84,6 +85,18 @@ export class RegistryStore {
         registry.bindings.some((binding) => !registry.customers.some((customer) => customer.id === binding.customerId))
       ) {
         throw new UserError('The customer registry has conflicting records. Restore its backup before continuing.', 409)
+      }
+      // A newer router release could save another Glide MCP address. Use the supported one and require a new check.
+      for (const customer of registry.customers) {
+        const url = new URL(customer.serverUrl)
+        if (url.hostname === 'mcp.glideapps.dev' && url.href !== GLIDE_ENDPOINT) {
+          customer.serverUrl = GLIDE_ENDPOINT
+          customer.lastCheck = {
+            state: 'unverified',
+            checkedAt: customer.updatedAt,
+            message: `This customer now uses ${GLIDE_ENDPOINT}. Check identity, or select Connect Glide if it asks you to sign in.`,
+          }
+        }
       }
       return registry
     } catch (error) {
@@ -161,8 +174,8 @@ export class RegistryStore {
     if (!parsed.success) throw new UserError('Enter a customer name, business, valid organization ID, and MCP URL.')
     const url = new URL(parsed.data.serverUrl)
     const isLocalFixture = url.protocol === 'http:' && url.hostname === '127.0.0.1' && url.pathname === '/mcp'
-    if (url.username || url.password || url.hash || url.search || (url.href !== 'https://mcp.glideapps.dev/mcp' && !isLocalFixture)) {
-      throw new UserError('This MVP supports https://mcp.glideapps.dev/mcp. Loopback MCP URLs are reserved for local tests.')
+    if (url.username || url.password || url.hash || url.search || (url.href !== GLIDE_ENDPOINT && !isLocalFixture)) {
+      throw new UserError(`This MVP supports ${GLIDE_ENDPOINT}. Loopback MCP URLs are reserved for local tests.`)
     }
     return this.update(async (registry) => {
       if (registry.customers.some((item) => item.serverUrl === url.href && item.expectedOrgId === parsed.data.expectedOrgId)) {
